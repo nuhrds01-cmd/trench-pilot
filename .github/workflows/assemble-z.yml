@@ -1,0 +1,44 @@
+name: Assemble compressed sources
+on:
+  push:
+    paths: ['.assemble/z/**', '.github/workflows/assemble-z.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decompress dashboard and engine
+        run: |
+          python3 <<'PY'
+          import json, base64, zlib, hashlib
+          from pathlib import Path
+          manifest = json.loads(Path('.assemble/z/manifest.json').read_text())
+          for name, meta in manifest.items():
+              parts_dir = Path('.assemble/z') / name
+              files = sorted(parts_dir.glob('part_*.b64'))
+              b64 = ''.join(f.read_text().strip() for f in files)
+              assert len(b64) == meta['b64_len'], (name, len(b64), meta['b64_len'])
+              raw = zlib.decompress(base64.b64decode(b64))
+              assert len(raw) == meta['raw_len'], (name, len(raw), meta['raw_len'])
+              target = Path(meta['target'])
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+              print('wrote', target, len(raw), hashlib.sha256(raw).hexdigest()[:12])
+          PY
+      - name: Generate package-lock.json
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/dashboard/trench-dashboard.tsx src/lib/bot/engine.ts package-lock.json
+          if git diff --staged --quiet; then echo no changes; else
+            git commit -m "Assemble dashboard, engine, and package-lock"
+            git push
+          fi
