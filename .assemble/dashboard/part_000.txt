@@ -1,0 +1,135 @@
+"use client";
+
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Activity,
+  Bot,
+  Copy,
+  Pause,
+  Play,
+  Radar,
+  Send,
+  Sparkles,
+  Trash2,
+  Wallet,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { WalletVault } from "@/components/dashboard/wallet-vault";
+import { useBotState } from "@/hooks/use-bot-state";
+import {
+  cn,
+  formatPct,
+  formatSol,
+  formatUsd,
+  shortAddress,
+} from "@/lib/utils";
+
+export function TrenchDashboard() {
+  const { state, error, pending, dispatch } = useBotState();
+  const [walletInput, setWalletInput] = useState("");
+  const [walletLabel, setWalletLabel] = useState("");
+  const [onchainBalance, setOnchainBalance] = useState<number | null>(null);
+
+  const live = Boolean(state?.settings.liveArmed && state.settings.mode === "live");
+
+  useEffect(() => {
+    if (!live) {
+      setOnchainBalance(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function pull() {
+      try {
+        const res = await fetch("/api/wallet", { cache: "no-store" });
+        const data = (await res.json()) as { balanceSol: number | null };
+        if (!cancelled && data.balanceSol != null) {
+          setOnchainBalance(data.balanceSol);
+        }
+        // Keep engine balance aligned with the vault (fire-and-forget)
+        await fetch("/api/bot/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "sync_balance" }),
+        });
+      } catch {
+        // keep last known
+      }
+    }
+
+    void pull();
+    const id = setInterval(() => void pull(), 8_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [live]);
+
+  const displayBalance = live
+    ? (onchainBalance ?? state?.balanceSol ?? 0)
+    : (state?.balanceSol ?? 0);
+
+  const unrealized = useMemo(() => {
+    if (!state) return 0;
+    return state.positions.reduce((acc, p) => {
+      const t = state.tokens.find((x) => x.mint === p.mint);
+      if (!t) return acc;
+      return acc + (p.amountTokens * t.priceSol - p.costSol);
+    }, 0);
+  }, [state]);
+
+  const ranked = useMemo(() => {
+    if (!state) return [];
+    return [...state.tokens].sort((a, b) => b.score - a.score);
+  }, [state]);
+
+  if (!state) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--void)] text-[var(--foam)]">
+        <div className="animate-pulse font-mono text-sm tracking-wide text-[var(--acid)]">
+          Booting scanner…
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[var(--void)] text-[var(--foam)]">
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
+      <div className="pointer-events-none absolute -left-24 top-0 h-80 w-80 rounded-full bg-[var(--acid)]/10 blur-3xl animate-drift" />
+      <div className="pointer-events-none absolute -right-16 bottom-10 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl animate-drift-slow" />
+
+      <header className="relative border-b border-[var(--line)]/80">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+          <div>
+            <p className="font-display text-4xl font-bold tracking-tight text-[var(--acid)] sm:text-5xl">
+              TrenchPilot
+            </p>
+            <p className="mt-1 max-w-xl text-sm text-[var(--muted)]">
+              ~$45 live test profile. Deposit SOL in the vault, arm live, then
+              buy from the scanner (auto-buy stays off until you enable it).
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              className={cn(
+                state.running
+                  ? "border-[var(--acid)]/40 text-[var(--acid)]"
+                  : "border-amber-400/40 text-amber-300",
+              )}
+            >
+              {state.running ? "engine live" : "paused"}
+            </Badge>
+            <Badge
+              className={
+                state.settings.liveArmed
+                  ? "border-[var(--acid)]/50 text-[var(--acid)]"
+                  : undefined
+              }
+            >
+              {state.settings.liveArmed ? "LIVE" : "paper"}
+            </Badge>
+            {state.busy ? <Badge 
