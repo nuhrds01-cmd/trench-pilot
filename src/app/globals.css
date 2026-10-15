@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --void: #07110c;
+  --panel: #0d1a14;
+  --panel-deep: #08140f;
+  --foam: #e7f7ec;
+  --muted: #8aa897;
+  --line: #1f3a2c;
+  --acid: #c8ff00;
+  --ink: #07110c;
+  --danger: #e11d48;
+  --background: var(--void);
+  --foreground: var(--foam);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--void);
+  color: var(--foam);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(200, 255, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 255, 0, 0.04) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(200, 255, 0, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(16, 185, 129, 0.08), transparent 50%);
+  background-size:
+    48px 48px,
+    48px 48px,
+    100% 100%,
+    100% 100%;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(24px, 18px, 0);
+  }
+}
+
+@keyframes drift-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-18px, -12px, 0) scale(1.05);
+  }
+}
+
+.animate-drift {
+  animation: drift 10s ease-in-out infinite;
+}
+
+.animate-drift-slow {
+  animation: drift-slow 14s ease-in-out infinite;
+}
+
+code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
